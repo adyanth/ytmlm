@@ -60,3 +60,14 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Docker Hub Description
+        if: github.event.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: adyanth/ytmlm
+          readme-filepath: ./README.md
+          short-description: "YouTube Music Liked Music Downloader"
