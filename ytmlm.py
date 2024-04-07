@@ -79,7 +79,7 @@ def ytmlm(
     print("Getting liked music")
     tracks = ytm.get_liked_songs(limit)["tracks"]
 
-    existing_ids = set(map(get_id_from_filepath, music_dir.glob("*.m4a")))
+    existing_ids = set(map(get_id_from_filepath, music_dir.glob("**/*.m4a")))
 
     to_download = list(filter(lambda x: x["videoId"] not in existing_ids, tracks))
 
@@ -96,7 +96,7 @@ def ytmlm(
             ),
             "writethumbnail": True,
             "outtmpl": {
-                "default": f"{music_dir.absolute()}/%(title)s - %(artist)s [%(id)s].%(ext)s",
+                "default": f"{music_dir.absolute()}/%(artist)s/%(album)s/%(title)s - %(artist)s [%(id)s].%(ext)s",
                 "pl_thumbnail": "",
             },
             "postprocessors": [
@@ -124,7 +124,7 @@ def ytmlm(
     print("Downloading lyrics")
     newIds = set(map(lambda x: x["videoId"], tracks))
     lyrics_errors = []
-    for file in (t := tqdm(music_dir.glob("*.m4a"))):
+    for file in (t := tqdm(music_dir.glob("**/*.m4a"))):
         if (videoId := get_id_from_filepath(file)) in newIds:
             t.set_description(f"Downloading lyrics for {file.name}")
             try:
@@ -142,8 +142,8 @@ def ytmlm(
     for track, e in ytdlp_errors:
         print(f"{track['title']}: {e}")
     print("\nlyrics failures:\n")
-    for track, e in lyrics_errors:
-        print(f"{track['title']}: {e}")
+    for file, e in lyrics_errors:
+        print(f"{file}: {e}")
 
 
 if __name__ == "__main__":
