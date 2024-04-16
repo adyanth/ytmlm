@@ -126,11 +126,14 @@ def ytmlm(
     lyrics_errors = []
     for file in (t := tqdm(music_dir.glob("**/*.m4a"))):
         if (videoId := get_id_from_filepath(file)) in newIds:
-            t.set_description(f"Downloading lyrics for {file.name}")
+            m4a = mutagen.File(file.absolute())
+            if "©lyr" in m4a and m4a["©lyr"] is not None:
+                t.set_description("Already downloaded")
+                continue
             try:
+                t.set_description(f"Downloading lyrics for {file.name}")
                 if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
                     lyrics = ytm.get_lyrics(lyricId).get("lyrics")
-                    m4a = mutagen.File(file.absolute())
                     m4a["©lyr"] = [lyrics]
                     m4a.save()
             except Exception as e:
@@ -140,7 +143,7 @@ def ytmlm(
 
     print("\nDownload complete.\n\nyt-dlp failures:\n")
     for track, e in ytdlp_errors:
-        print(f"{track['title']}: {e}")
+        print(f"{track.get('title', 'Unknown')}: {e}")
     print("\nlyrics failures:\n")
     for file, e in lyrics_errors:
         print(f"{file}: {e}")
