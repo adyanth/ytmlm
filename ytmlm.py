@@ -8,6 +8,7 @@ from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 from ytmusicapi.setup import setup_oauth
 
+LYR_TAG = "©lyr"
 
 def get_id_from_filename(file: str):
     return file.split("[")[-1].split("]")[0]
@@ -115,35 +116,55 @@ def ytmlm(
     ytdlp_errors = []
     for track in (t := tqdm(to_download)):
         try:
-            t.set_description(f"Downloading song {track['title']}")
+            t.set_description(
+                f"Downloading song {track.get('title', track.get('videoId', 'Unknwon'))}"
+            )
             url = f"https://music.youtube.com/watch?v={track['videoId']}"
             ytdl.download(url)
         except Exception as e:
             ytdlp_errors.append((track, e))
 
-    print("Downloading lyrics")
+    print("Downloading lyrics: ", end="")
     newIds = set(map(lambda x: x["videoId"], tracks))
+    videoId_file_dict = dict(
+        filter(
+            lambda videoId_file: videoId_file[0] in newIds,
+            map(
+                lambda file: (get_id_from_filepath(file), file),
+                music_dir.glob("**/*.m4a"),
+            ),
+        )
+    )
+    m4a_dict = dict(
+        filter(
+            lambda videoId_m4a: LYR_TAG not in videoId_m4a[1]
+            or videoId_m4a[1][LYR_TAG] is None,
+            map(
+                lambda videoId_file: (
+                    videoId_file[0],
+                    mutagen.File(videoId_file[1].absolute()),
+                ),
+                videoId_file_dict.items(),
+            ),
+        )
+    )
+    print(f"{len(m4a_dict)} new to download")
     lyrics_errors = []
-    for file in (t := tqdm(music_dir.glob("**/*.m4a"))):
-        if (videoId := get_id_from_filepath(file)) in newIds:
-            m4a = mutagen.File(file.absolute())
-            if "©lyr" in m4a and m4a["©lyr"] is not None:
-                t.set_description("Already downloaded")
-                continue
-            try:
-                t.set_description(f"Downloading lyrics for {file.name}")
-                if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
-                    lyrics = ytm.get_lyrics(lyricId).get("lyrics")
-                    m4a["©lyr"] = [lyrics]
-                    m4a.save()
-            except Exception as e:
-                lyrics_errors.append((file.name, e))
-        else:
-            t.set_description(f"Skipping {file.name}")
+    for videoId, m4a in (t := tqdm(m4a_dict.items())):
+        try:
+            t.set_description(
+                f"Downloading lyrics for {videoId_file_dict[videoId].name}"
+            )
+            if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
+                lyrics = ytm.get_lyrics(lyricId).get("lyrics")
+                m4a[LYR_TAG] = [lyrics]
+                m4a.save()
+        except Exception as e:
+            lyrics_errors.append((videoId_file_dict[videoId].name, e))
 
     print("\nDownload complete.\n\nyt-dlp failures:\n")
     for track, e in ytdlp_errors:
-        print(f"{track.get('title', 'Unknown')}: {e}")
+        print(f"{track.get('title', track.get('videoId', 'Unknown'))}: {e}")
     print("\nlyrics failures:\n")
     for file, e in lyrics_errors:
         print(f"{file}: {e}")
