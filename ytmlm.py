@@ -80,6 +80,9 @@ def ytmlm(
     print("Getting liked music")
     tracks = ytm.get_liked_songs(limit)["tracks"]
 
+    # To debug
+    # tracks = [{"videoId": "videoId", "title": "Test Song"}]
+
     existing_ids = set(map(get_id_from_filepath, music_dir.glob("**/*.m4a")))
 
     to_download = list(filter(lambda x: x["videoId"] not in existing_ids, tracks))
@@ -158,7 +161,9 @@ def ytmlm(
             if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
                 lyrics = ytm.get_lyrics(lyricId).get("lyrics")
                 m4a[LYR_TAG] = [lyrics]
-                m4a.save()
+            else:
+                m4a[LYR_TAG] = ["No lyrics found."]
+            m4a.save()
         except Exception as e:
             lyrics_errors.append((videoId_file_dict[videoId].name, e))
 
