@@ -10,6 +10,8 @@ from ytmusicapi import YTMusic
 from ytmusicapi.setup import setup_oauth
 
 LYR_TAG = "©lyr"
+NO_SYNCED_LYRICS = "[00:00.00] No synced lyrics found."
+NO_UNSYNCED_LYRICS = "No unsynced lyrics found."
 
 
 def get_id_from_filename(file: str):
@@ -38,7 +40,7 @@ def get_synced_lyrics(file_path):
         case 200:
             return response.json()["syncedLyrics"]
         case 404:
-            return "[00:00.00] No synced lyrics found."
+            return NO_SYNCED_LYRICS
         case _:
             response.raise_for_status()
             raise Exception()
@@ -182,12 +184,13 @@ def ytmlm(
     print(f"{len(m4a_dict)} new to download")
     lyrics_errors = []
     for videoId, m4a in (t := tqdm(m4a_dict.items())):
+        file: Path = videoId_file_dict[videoId]
         # Clean up
         if len(m4a["©day"]) == 1:
             if len(m4a["©day"][0]) != 4:
                 m4a["©day"][0] = m4a["©day"][0][:4]
 
-        t.set_description(f"Downloading lyrics for {videoId_file_dict[videoId].name}")
+        t.set_description(f"Downloading lyrics for {file.name}")
 
         lyrics = []
         # Unsynced lyrics from YT
@@ -195,18 +198,22 @@ def ytmlm(
             if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
                 unsynced = ytm.get_lyrics(lyricId).get("lyrics")
             else:
-                unsynced = "No lyrics found."
+                unsynced = NO_UNSYNCED_LYRICS
             lyrics.append(unsynced)
         except Exception as e:
-            lyrics_errors.append((videoId_file_dict[videoId].name, e))
+            lyrics_errors.append((file.name, e))
 
         # Synced lyrics from lrclib
         synced = None
         try:
-            synced = get_synced_lyrics(videoId_file_dict[videoId])
+            synced = get_synced_lyrics(file)
             lyrics.append(synced)
+            # Also dump to lrc file
+            if synced != NO_SYNCED_LYRICS:
+                with open(file.with_suffix(".lrc"), "w") as f:
+                    f.write(synced)
         except Exception as e:
-            lyrics_errors.append((videoId_file_dict[videoId].name, e))
+            lyrics_errors.append((file.name, e))
 
         m4a[LYR_TAG] = lyrics
         # Save the lyrics
