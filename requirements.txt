@@ -1,6 +1,7 @@
 click==8.1.7
 mutagen==1.47.0
 sh==2.0.6
+tinytag==1.10.1
 tqdm==4.66.2
 ytmusicapi==1.6.0
 yt-dlp==2024.3.10

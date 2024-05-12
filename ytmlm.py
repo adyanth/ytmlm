@@ -3,6 +3,7 @@ import click
 import mutagen
 
 from pathlib import Path
+from tinytag import TinyTag
 from tqdm import tqdm
 from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
@@ -10,12 +11,37 @@ from ytmusicapi.setup import setup_oauth
 
 LYR_TAG = "©lyr"
 
+
 def get_id_from_filename(file: str):
     return file.split("[")[-1].split("]")[0]
 
 
 def get_id_from_filepath(file: Path):
     return get_id_from_filename(file.name)
+
+
+def get_synced_lyrics(file_path):
+    import requests
+
+    tags = TinyTag.get(file_path)
+
+    url = "https://lrclib.net/api/get"
+    params = {
+        "artist_name": tags.artist,
+        "track_name": tags.title,
+        "album_name": tags.album,
+        "duration": int(tags.duration),
+    }
+
+    response = requests.get(url, params=params)
+    match response.status_code:
+        case 200:
+            return response.json()["syncedLyrics"]
+        case 404:
+            return "[00:00.00] No synced lyrics found."
+        case _:
+            response.raise_for_status()
+            raise Exception()
 
 
 @click.command()
@@ -141,7 +167,9 @@ def ytmlm(
     m4a_dict = dict(
         filter(
             lambda videoId_m4a: LYR_TAG not in videoId_m4a[1]
-            or videoId_m4a[1][LYR_TAG] is None,
+            or videoId_m4a[1][LYR_TAG] is None
+            # Need both synced and unsynced lyrics to not try again
+            or len(videoId_m4a[1][LYR_TAG]) != 2,
             map(
                 lambda videoId_file: (
                     videoId_file[0],
@@ -154,18 +182,35 @@ def ytmlm(
     print(f"{len(m4a_dict)} new to download")
     lyrics_errors = []
     for videoId, m4a in (t := tqdm(m4a_dict.items())):
+        # Clean up
+        if len(m4a["©day"]) == 1:
+            if len(m4a["©day"][0]) != 4:
+                m4a["©day"][0] = m4a["©day"][0][:4]
+
+        t.set_description(f"Downloading lyrics for {videoId_file_dict[videoId].name}")
+
+        lyrics = []
+        # Unsynced lyrics from YT
         try:
-            t.set_description(
-                f"Downloading lyrics for {videoId_file_dict[videoId].name}"
-            )
             if lyricId := ytm.get_watch_playlist(videoId).get("lyrics"):
-                lyrics = ytm.get_lyrics(lyricId).get("lyrics")
-                m4a[LYR_TAG] = [lyrics]
+                unsynced = ytm.get_lyrics(lyricId).get("lyrics")
             else:
-                m4a[LYR_TAG] = ["No lyrics found."]
-            m4a.save()
+                unsynced = "No lyrics found."
+            lyrics.append(unsynced)
         except Exception as e:
             lyrics_errors.append((videoId_file_dict[videoId].name, e))
+
+        # Synced lyrics from lrclib
+        synced = None
+        try:
+            synced = get_synced_lyrics(videoId_file_dict[videoId])
+            lyrics.append(synced)
+        except Exception as e:
+            lyrics_errors.append((videoId_file_dict[videoId].name, e))
+
+        m4a[LYR_TAG] = lyrics
+        # Save the lyrics
+        m4a.save()
 
     print("\nDownload complete.\n\nyt-dlp failures:\n")
     for track, e in ytdlp_errors:
