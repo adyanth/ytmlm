@@ -10,6 +10,7 @@ from ytmusicapi import YTMusic
 from ytmusicapi.setup import setup_oauth
 
 LYR_TAG = "©lyr"
+DAY_TAG = "©day"
 NO_SYNCED_LYRICS = "[00:00.00] No synced lyrics found."
 NO_UNSYNCED_LYRICS = "No unsynced lyrics found."
 
@@ -38,7 +39,10 @@ def get_synced_lyrics(file_path):
     response = requests.get(url, params=params)
     match response.status_code:
         case 200:
-            return response.json()["syncedLyrics"]
+            if lyrics := response.json()["syncedLyrics"]:
+                return lyrics
+            else:
+                return NO_SYNCED_LYRICS
         case 404:
             return NO_SYNCED_LYRICS
         case _:
@@ -186,9 +190,9 @@ def ytmlm(
     for videoId, m4a in (t := tqdm(m4a_dict.items())):
         file: Path = videoId_file_dict[videoId]
         # Clean up
-        if len(m4a["©day"]) == 1:
-            if len(m4a["©day"][0]) != 4:
-                m4a["©day"][0] = m4a["©day"][0][:4]
+        if len(m4a[DAY_TAG]) == 1:
+            if len(m4a[DAY_TAG][0]) != 4:
+                m4a[DAY_TAG][0] = m4a[DAY_TAG][0][:4]
 
         t.set_description(f"Downloading lyrics for {file.name}")
 
