@@ -4,4 +4,4 @@ sh==2.0.6
 tinytag==1.10.1
 tqdm==4.66.2
 ytmusicapi==1.7.5
-yt-dlp==2024.3.10
+yt-dlp==2024.7.9
