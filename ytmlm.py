@@ -43,7 +43,7 @@ def get_synced_lyrics(file_path):
                 return lyrics
             else:
                 return NO_SYNCED_LYRICS
-        case 404:
+        case 400 | 404:
             return NO_SYNCED_LYRICS
         case _:
             response.raise_for_status()
