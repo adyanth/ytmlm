@@ -7,3 +7,4 @@ __pycache__/
 
 cookie.*
 oauth.*
+client_secret.*

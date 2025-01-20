@@ -8,6 +8,7 @@ from tqdm import tqdm
 from yt_dlp import YoutubeDL
 from ytmusicapi import YTMusic
 from ytmusicapi.setup import setup_oauth
+from ytmusicapi.auth.oauth import OAuthCredentials
 
 LYR_TAG = "©lyr"
 DAY_TAG = "©day"
@@ -80,6 +81,20 @@ def get_synced_lyrics(file_path):
     help="JSON contents of the oauth.json file",
 )
 @click.option(
+    "--oauth-client-secret-file",
+    envvar="YTMLM_OAUTH_CLIENT_SECRET_FILE",
+    type=Path,
+    default="./client_secret.json",
+    help="TV or limited device scoped OAuth2.0 Client Secret file path",
+)
+@click.option(
+    "--oauth-client-secret-content",
+    envvar="YTMLM_OAUTH_CLIENT_SECRET_CONTENT",
+    type=str,
+    default=None,
+    help="TV or limited device scoped OAuth2.0 Client Secret Contents",
+)
+@click.option(
     "--cookie-txt",
     envvar="YTMLM_COOKIE_TXT",
     default=None,
@@ -91,6 +106,8 @@ def ytmlm(
     limit: int,
     oauth_file: Path,
     oauth_content: str,
+    oauth_client_secret_file: str,
+    oauth_client_secret_content: str,
     cookie_txt: Path,
 ):
     """Download liked music from YTM"""
@@ -107,7 +124,21 @@ def ytmlm(
             setup_oauth(filepath=str(oauth_file))
         oauth_content = json.loads(oauth_file.read_text())
 
-    ytm = YTMusic(oauth_content)
+    oauth_client_dict = None
+    if oauth_client_secret_content is not None:
+        oauth_client_dict = oauth_client_secret_content
+    else:
+        if not oauth_client_secret_file.exists():
+            raise Exception("Client secret file or content needed")
+        oauth_client_dict = json.loads(oauth_client_secret_file.read_text())
+
+    ytm = YTMusic(
+        oauth_content,
+        oauth_credentials=OAuthCredentials(
+            client_id=oauth_client_dict["installed"]["client_id"],
+            client_secret=oauth_client_dict["installed"]["client_secret"]
+        )
+    )
 
     print("Getting liked music")
     tracks = ytm.get_liked_songs(limit)["tracks"]
