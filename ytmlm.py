@@ -101,6 +101,13 @@ def get_synced_lyrics(file_path):
     type=Path,
     help="Netscape formatted cookie.txt for yt-dlp",
 )
+@click.option(
+    "--skip-ids",
+    envvar="YTMLM_SKIP_IDS",
+    default=None,
+    type=str,
+    help="Comma separated Youtube IDs to skip download",
+)
 def ytmlm(
     music_dir: Path,
     limit: int,
@@ -109,6 +116,7 @@ def ytmlm(
     oauth_client_secret_file: str,
     oauth_client_secret_content: str,
     cookie_txt: Path,
+    skip_ids: str,
 ):
     """Download liked music from YTM"""
 
@@ -147,6 +155,10 @@ def ytmlm(
     # tracks = [{"videoId": "videoId", "title": "Test Song"}]
 
     existing_ids = set(map(get_id_from_filepath, music_dir.glob("**/*.m4a")))
+    if skip_ids:
+        ids = list(map(lambda x: x.strip(), skip_ids.split(",")))
+        if len(ids) > 0 and len(ids[0]) > 0:
+            existing_ids.update(ids)
 
     to_download = list(filter(lambda x: x["videoId"] not in existing_ids, tracks))
 
